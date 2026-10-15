@@ -15,7 +15,7 @@ public sealed class AppSettings
 
     public string SupabaseUrl { get; set; } = "";
     public string SupabaseAnonKey { get; set; } = "";
-    public string WebUrl { get; set; } = "http://localhost:5173";
+    public string WebUrl { get; set; } = "https://thestudycafe.vercel.app";
     public int LoopbackPort { get; set; } = 47800;
 
     private static AppSettings? _current;
@@ -29,7 +29,15 @@ public sealed class AppSettings
             {
                 var json = File.ReadAllText(SettingsFilePath);
                 var settings = JsonSerializer.Deserialize<AppSettings>(json);
-                if (settings != null) return settings;
+                if (settings != null)
+                {
+                    if (string.IsNullOrWhiteSpace(settings.WebUrl) || settings.WebUrl.Contains("localhost"))
+                    {
+                        settings.WebUrl = "https://thestudycafe.vercel.app";
+                        settings.Save();
+                    }
+                    return settings;
+                }
             }
         }
         catch (Exception ex)

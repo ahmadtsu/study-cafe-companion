@@ -128,7 +128,7 @@ public partial class TimerWidgetView : UserControl
             var url = AppSettings.Current.WebUrl;
             if (string.IsNullOrWhiteSpace(url))
             {
-                url = "http://localhost:5173";
+                url = "https://thestudycafe.vercel.app";
             }
 
             Process.Start(new ProcessStartInfo
