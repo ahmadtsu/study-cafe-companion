@@ -108,7 +108,8 @@ public sealed class SupabaseRealtimeService : IDisposable
                 }
                 case "BREAK_ENDED":
                 {
-                    _engine.HandleBreakEnded();
+                    var payload = JsonSerializer.Deserialize<BreakEndedPayload>(json);
+                    _engine.HandleBreakEnded(payload?.BreakZeroReachedAt);
                     break;
                 }
                 case "TOGGLE_PAUSE":

@@ -60,10 +60,20 @@ public partial class TimerWidgetView : UserControl
                 phaseBrush = (Brush)FindResource("PhaseFocusBrush");
                 phaseLabel = isPaused ? "Focus (Paused)" : "Focus";
             }
-            else if (phase == "break" || phase == "break_ended")
+            else if (phase == "break")
             {
                 phaseBrush = (Brush)FindResource("PhaseBreakBrush");
                 phaseLabel = isPaused ? "Break (Paused)" : "Break";
+            }
+            else if (phase == "break_ended")
+            {
+                phaseBrush = (Brush)FindResource("PhaseBreakEndedBrush");
+                phaseLabel = isPaused ? "Break Over (Paused)" : "Break Over";
+            }
+            else if (phase == "left_table")
+            {
+                phaseBrush = (Brush)FindResource("PhaseBreakEndedBrush");
+                phaseLabel = "Left Table";
             }
             else
             {

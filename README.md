@@ -39,7 +39,7 @@
   * Mathematically centered directly above the widget pill, floating 10 DIP above the taskbar with soft drop shadow and rounded corners.
 * ⏱️ **Drift-Free Live Countdown**:
   * Accurate to the millisecond, rendering crisp tabular numbers in `Segoe UI Variable`.
-  * Distinct phase indicators: **Focus** (terracotta `#E06D53`), **Break** (sage green `#5EAA8D`), and **Ready** (neutral gray).
+  * Distinct phase indicators: **Focus** (terracotta `#E06D53`), **Break** (sage green `#5EAA8D`), **Break Over** (alert red `#EF4444` counting time spent outside the break), and **Ready** (neutral gray).
 * 🔄 **Zero-Config Real-Time Sync**:
   * **Local HTTP Loopback (`127.0.0.1:47800`)**: Browser tabs in Study Cafe instantly sync timer state to the companion without any setup.
   * **Supabase Realtime**: Connects as a listener-only peer to room broadcasts for remote synchronization.

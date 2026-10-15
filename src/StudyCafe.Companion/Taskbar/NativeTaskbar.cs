@@ -120,6 +120,138 @@ internal static class NativeTaskbar
         int cy,
         uint uFlags);
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct STARTUPINFO
+    {
+        public int cb;
+        public string? lpReserved;
+        public string? lpDesktop;
+        public string? lpTitle;
+        public int dwX;
+        public int dwY;
+        public int dwXSize;
+        public int dwYSize;
+        public int dwXCountChars;
+        public int dwYCountChars;
+        public int dwFillAttribute;
+        public int dwFlags;
+        public short wShowWindow;
+        public short cbReserved2;
+        public nint lpReserved2;
+        public nint hStdInput;
+        public nint hStdOutput;
+        public nint hStdError;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PROCESS_INFORMATION
+    {
+        public nint hProcess;
+        public nint hThread;
+        public int dwProcessId;
+        public int dwThreadId;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CreateProcess(
+        string? lpApplicationName,
+        string? lpCommandLine,
+        nint lpProcessAttributes,
+        nint lpThreadAttributes,
+        bool bInheritHandles,
+        uint dwCreationFlags,
+        nint lpEnvironment,
+        string? lpCurrentDirectory,
+        ref STARTUPINFO lpStartupInfo,
+        out PROCESS_INFORMATION lpProcessInformation);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseHandle(nint hObject);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern nint GetThreadDesktop(int dwThreadId);
+
+    [DllImport("kernel32.dll")]
+    private static extern int GetCurrentThreadId();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetUserObjectInformation(nint hObj, int nIndex, StringBuilder pvInfo, int nLength, out int lpnLengthNeeded);
+
+    internal static string GetCurrentDesktopName()
+    {
+        try
+        {
+            nint hDesk = GetThreadDesktop(GetCurrentThreadId());
+            if (hDesk == nint.Zero) return string.Empty;
+
+            var sb = new StringBuilder(256);
+            return GetUserObjectInformation(hDesk, 2, sb, sb.Capacity, out _) ? sb.ToString() : string.Empty;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// If the process was started on an isolated or virtual desktop (e.g. from an IDE terminal or sandbox),
+    /// re-launches the application onto WinSta0\Default so it can dock into Shell_TrayWnd on the user's screen.
+    /// Returns false if re-launched (caller should exit).
+    /// </summary>
+    internal static bool EnsureRunningOnInteractiveDesktop(string[] args)
+    {
+        string currentDesk = GetCurrentDesktopName();
+        if (string.IsNullOrEmpty(currentDesk) || string.Equals(currentDesk, "Default", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        App.Log($"Current desktop is '{currentDesk}' (not 'Default'). Re-launching on WinSta0\\Default...");
+
+        try
+        {
+            var exePath = Environment.ProcessPath;
+            if (string.IsNullOrEmpty(exePath) || !System.IO.File.Exists(exePath))
+            {
+                exePath = Process.GetCurrentProcess().MainModule?.FileName;
+            }
+
+            if (!string.IsNullOrEmpty(exePath) && System.IO.File.Exists(exePath))
+            {
+                var argString = args.Length > 0 ? " " + string.Join(" ", args.Select(a => $"\"{a}\"")) : "";
+                var cmdLine = $"\"{exePath}\"{argString}";
+
+                var si = new STARTUPINFO();
+                si.cb = Marshal.SizeOf<STARTUPINFO>();
+                si.lpDesktop = @"WinSta0\Default";
+
+                string? workingDir = System.IO.Path.GetDirectoryName(exePath);
+
+                if (CreateProcess(null, cmdLine, nint.Zero, nint.Zero, false, 0, nint.Zero, workingDir, ref si, out var pi))
+                {
+                    App.Log($"Successfully re-launched on WinSta0\\Default (PID {pi.dwProcessId}). Exiting current process.");
+                    if (pi.hProcess != nint.Zero) CloseHandle(pi.hProcess);
+                    if (pi.hThread != nint.Zero) CloseHandle(pi.hThread);
+                    return false;
+                }
+                else
+                {
+                    int err = Marshal.GetLastWin32Error();
+                    App.Log($"Failed to re-launch on WinSta0\\Default: error {err}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"EnsureRunningOnInteractiveDesktop exception: {ex.Message}");
+        }
+
+        return true;
+    }
+
     internal static nint FindTaskbarHandle()
     {
         try

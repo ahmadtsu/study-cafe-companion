@@ -138,6 +138,42 @@ public sealed class LocalLoopbackService : IDisposable
                     return;
                 }
 
+                // Handle POST /leave or POST /leave-table
+                if (method == "POST" && (path == "/leave" || path == "/leave-table" || path.StartsWith("/leave?") || path.StartsWith("/leave-table?")))
+                {
+                    string body = "";
+                    if (contentLength > 0)
+                    {
+                        char[] buffer = new char[contentLength];
+                        int totalRead = 0;
+                        while (totalRead < contentLength)
+                        {
+                            int read = await reader.ReadAsync(buffer, totalRead, contentLength - totalRead);
+                            if (read <= 0) break;
+                            totalRead += read;
+                        }
+                        body = new string(buffer, 0, totalRead);
+                    }
+
+                    long? leftAt = null;
+                    if (!string.IsNullOrWhiteSpace(body))
+                    {
+                        try
+                        {
+                            using var doc = JsonDocument.Parse(body);
+                            if (doc.RootElement.TryGetProperty("leftTableAt", out var prop) && prop.TryGetInt64(out var ts))
+                            {
+                                leftAt = ts;
+                            }
+                        }
+                        catch { }
+                    }
+
+                    _engine.HandleLeaveTable(leftAt);
+                    await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}");
+                    return;
+                }
+
                 // Handle GET /health
                 if (method == "GET" && (path == "/health" || path.StartsWith("/health?")))
                 {

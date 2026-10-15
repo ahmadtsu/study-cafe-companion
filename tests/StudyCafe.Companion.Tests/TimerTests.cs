@@ -68,6 +68,167 @@ public class TimerTests
     }
 
     [Fact]
+    public void TimerEngine_Formats_BreakCountdown()
+    {
+        var engine = new TimerCountdownEngine();
+        string? resultTime = null;
+        string? resultPhase = null;
+
+        engine.StateChanged += (time, phase, _, _) =>
+        {
+            resultTime = time;
+            resultPhase = phase;
+        };
+
+        // 5 minute break started 30 seconds ago -> 04:30 remaining
+        long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        engine.HandleBreakStart(5, now - 30_000);
+
+        Assert.Equal("04:30", resultTime);
+        Assert.Equal("break", resultPhase);
+    }
+
+    [Fact]
+    public void TimerEngine_CountsTimeSpentOutsideBreak_WhenBreakExpires()
+    {
+        var engine = new TimerCountdownEngine();
+        string? resultTime = null;
+        string? resultPhase = null;
+
+        engine.StateChanged += (time, phase, _, _) =>
+        {
+            resultTime = time;
+            resultPhase = phase;
+        };
+
+        // 5 minute break started 5 minutes and 30 seconds ago -> 30 seconds spent outside break
+        long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        engine.HandleBreakStart(5, now - (5 * 60 + 30) * 1000);
+
+        Assert.Equal("00:30", resultTime);
+        Assert.Equal("break_ended", resultPhase);
+    }
+
+    [Fact]
+    public void TimerEngine_CountsTimeSpentOutsideBreak_FromBreakZeroReachedAt()
+    {
+        var engine = new TimerCountdownEngine();
+        string? resultTime = null;
+        string? resultPhase = null;
+
+        engine.StateChanged += (time, phase, _, _) =>
+        {
+            resultTime = time;
+            resultPhase = phase;
+        };
+
+        // RoomState synced with break_ended and breakZeroReachedAt set 90 seconds ago -> 01:30
+        long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        engine.ApplyRoomState(new RoomStateModel
+        {
+            Phase = "break_ended",
+            DurationSec = 5 * 60,
+            StartedAt = now - 390_000,
+            BreakZeroReachedAt = now - 90_000,
+            IsPaused = false,
+        });
+
+        Assert.Equal("01:30", resultTime);
+        Assert.Equal("break_ended", resultPhase);
+    }
+
+    [Fact]
+    public void TimerEngine_CountsHours_WhenLongTimeOutsideBreak()
+    {
+        var engine = new TimerCountdownEngine();
+        string? resultTime = null;
+        string? resultPhase = null;
+
+        engine.StateChanged += (time, phase, _, _) =>
+        {
+            resultTime = time;
+            resultPhase = phase;
+        };
+
+        // Break ended 1 hour, 15 minutes, 10 seconds ago -> 1:15:10
+        long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        long breakEndedMs = now - (1 * 3600 + 15 * 60 + 10) * 1000;
+        engine.HandleBreakEnded(breakEndedMs);
+
+        Assert.Equal("1:15:10", resultTime);
+        Assert.Equal("break_ended", resultPhase);
+    }
+
+    [Fact]
+    public void TimerEngine_TransitionsBackToWork_WhenPomoStartsAfterBreak()
+    {
+        var engine = new TimerCountdownEngine();
+        string? resultTime = null;
+        string? resultPhase = null;
+
+        engine.StateChanged += (time, phase, _, _) =>
+        {
+            resultTime = time;
+            resultPhase = phase;
+        };
+
+        // First on break which has ended
+        long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        engine.HandleBreakStart(5, now - 400_000);
+        Assert.Equal("break_ended", resultPhase);
+
+        // Then new focus starts
+        engine.HandlePomoStart(25, now - 10_000);
+        Assert.Equal("24:50", resultTime);
+        Assert.Equal("work", resultPhase);
+    }
+
+    [Fact]
+    public void TimerEngine_CountsTimeSpentAway_WhenUserLeavesTable()
+    {
+        var engine = new TimerCountdownEngine();
+        string? resultTime = null;
+        string? resultPhase = null;
+
+        engine.StateChanged += (time, phase, _, _) =>
+        {
+            resultTime = time;
+            resultPhase = phase;
+        };
+
+        // User left table 45 seconds ago -> counts 00:45 with left_table phase
+        long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        engine.HandleLeaveTable(now - 45_000);
+
+        Assert.Equal("00:45", resultTime);
+        Assert.Equal("left_table", resultPhase);
+    }
+
+    [Fact]
+    public void TimerEngine_AppliesRoomState_WithLeftTablePhase()
+    {
+        var engine = new TimerCountdownEngine();
+        string? resultTime = null;
+        string? resultPhase = null;
+
+        engine.StateChanged += (time, phase, _, _) =>
+        {
+            resultTime = time;
+            resultPhase = phase;
+        };
+
+        long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        engine.ApplyRoomState(new RoomStateModel
+        {
+            Phase = "left_table",
+            LeftTableAt = now - 125_000,
+        });
+
+        Assert.Equal("02:05", resultTime);
+        Assert.Equal("left_table", resultPhase);
+    }
+
+    [Fact]
     public void TaskbarBounds_ReturnsNull_WhenTaskbarVertical()
     {
         var taskbarRect = new Rect(0, 0, 48, 1080); // vertical

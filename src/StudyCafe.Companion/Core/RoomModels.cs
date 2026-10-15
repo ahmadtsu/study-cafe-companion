@@ -37,11 +37,23 @@ public sealed class RoomStateModel
     [JsonPropertyName("pausedAt")]
     public long? PausedAt { get; set; }
 
+    [JsonPropertyName("breakZeroReachedAt")]
+    public long? BreakZeroReachedAt { get; set; }
+
+    [JsonPropertyName("leftTableAt")]
+    public long? LeftTableAt { get; set; }
+
     [JsonPropertyName("participants")]
     public List<RoomParticipant>? Participants { get; set; }
 
     [JsonIgnore]
     public int ParticipantCount => Participants?.Count ?? 0;
+}
+
+public sealed class BreakEndedPayload
+{
+    [JsonPropertyName("breakZeroReachedAt")]
+    public long? BreakZeroReachedAt { get; set; }
 }
 
 public sealed class StartPomoPayload

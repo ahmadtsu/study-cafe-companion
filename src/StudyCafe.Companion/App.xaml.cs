@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using StudyCafe.Companion.Core;
+using StudyCafe.Companion.Taskbar;
 using StudyCafe.Companion.Themes;
 using StudyCafe.Companion.Tray;
 using StudyCafe.Companion.UI;
@@ -54,6 +55,12 @@ public partial class App : Application
         };
 
         Log("App starting...");
+
+        if (!NativeTaskbar.EnsureRunningOnInteractiveDesktop(e.Args))
+        {
+            Shutdown();
+            return;
+        }
 
         try
         {

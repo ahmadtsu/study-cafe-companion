@@ -55,14 +55,17 @@ public sealed class TrayIconManager : IDisposable
         string phaseLabel = phase switch
         {
             "work" => isPaused ? "Focus (Paused)" : "Focus",
-            "break" or "break_ended" => isPaused ? "Break (Paused)" : "Break",
+            "break" => isPaused ? "Break (Paused)" : "Break",
+            "break_ended" => isPaused ? "Break Over (Paused)" : "Break Over",
+            "left_table" => "Left Table",
             _ => "Ready",
         };
 
         DrawingColor iconColor = phase switch
         {
             "work" => DrawingColor.FromArgb(255, 224, 109, 83),
-            "break" or "break_ended" => DrawingColor.FromArgb(255, 94, 170, 141),
+            "break" => DrawingColor.FromArgb(255, 94, 170, 141),
+            "break_ended" or "left_table" => DrawingColor.FromArgb(255, 239, 68, 68),
             _ => DrawingColor.FromArgb(255, 142, 142, 147),
         };
 

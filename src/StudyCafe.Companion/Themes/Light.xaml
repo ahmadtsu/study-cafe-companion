@@ -25,6 +25,8 @@
   <!-- Study Cafe Phase accent colors -->
   <SolidColorBrush x:Key="PhaseFocusBrush" Color="#A65340" />
   <SolidColorBrush x:Key="PhaseBreakBrush" Color="#3B7D64" />
+  <SolidColorBrush x:Key="PhaseBreakEndedBrush" Color="#D13438" />
+  <SolidColorBrush x:Key="PhaseBreakOverBrush" Color="#D13438" />
   <SolidColorBrush x:Key="PhaseIdleBrush" Color="#6E6E73" />
 
   <!-- Context menu tokens adapted from EverythingToolbar Win11 Light -->

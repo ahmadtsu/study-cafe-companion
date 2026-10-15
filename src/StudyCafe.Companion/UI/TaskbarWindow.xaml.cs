@@ -161,12 +161,15 @@ public partial class TaskbarWindow : Window
     {
         if (_attachRetriesLeft-- <= 0) return;
 
-        _dockRetryTimer ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-        _dockRetryTimer.Tick += (_, _) =>
+        if (_dockRetryTimer == null)
         {
-            _dockRetryTimer.Stop();
-            AttachToTaskbar();
-        };
+            _dockRetryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            _dockRetryTimer.Tick += (_, _) =>
+            {
+                _dockRetryTimer.Stop();
+                AttachToTaskbar();
+            };
+        }
         _dockRetryTimer.Start();
     }
 
