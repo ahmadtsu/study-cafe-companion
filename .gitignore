@@ -1,0 +1,28 @@
+## Build results
+[Bb]in/
+[Oo]bj/
+publish/
+installer/output/
+
+## Visual Studio & IDEs
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Reference clones (kept local)
+deskbar-widget/
+EverythingToolbar/
+
+## Logs and scratch files
+*.log
+scratch/
+scratch_test.cs
+
+## OS generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

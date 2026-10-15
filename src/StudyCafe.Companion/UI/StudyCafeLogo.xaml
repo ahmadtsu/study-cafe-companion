@@ -1,0 +1,21 @@
+<UserControl x:Class="StudyCafe.Companion.UI.StudyCafeLogo"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="16" Height="16"
+             Background="Transparent">
+    <Viewbox Stretch="Uniform">
+        <Canvas Width="24" Height="24" SnapsToDevicePixels="True">
+            <!-- Outer circle (r=10) -->
+            <Ellipse Canvas.Left="2" Canvas.Top="2" Width="20" Height="20"
+                     Stroke="{Binding Path=StrokeBrush, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                     StrokeThickness="2" Fill="Transparent" />
+            <!-- Middle circle (r=6) -->
+            <Ellipse Canvas.Left="6" Canvas.Top="6" Width="12" Height="12"
+                     Stroke="{Binding Path=StrokeBrush, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                     StrokeThickness="2" Fill="Transparent" />
+            <!-- Center circle (r=2) - filled center dot matching favicon -->
+            <Ellipse Canvas.Left="10" Canvas.Top="10" Width="4" Height="4"
+                     Fill="{Binding Path=StrokeBrush, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+        </Canvas>
+    </Viewbox>
+</UserControl>

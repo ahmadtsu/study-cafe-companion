@@ -1,0 +1,15 @@
+<Window x:Class="StudyCafe.Companion.UI.TaskbarWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:StudyCafe.Companion.UI"
+        Title="StudyCafe.Companion"
+        Width="120" Height="48"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowStartupLocation="Manual"
+        WindowStyle="None">
+    <local:TimerWidgetView x:Name="WidgetView" />
+</Window>

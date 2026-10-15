@@ -1,0 +1,35 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 9
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Run unit tests
+      run: dotnet test tests/StudyCafe.Companion.Tests/StudyCafe.Companion.Tests.csproj -c Release
+
+    - name: Build portable binary
+      shell: pwsh
+      run: .\scripts\publish-portable.ps1
+
+    - name: Verify build artifacts
+      shell: pwsh
+      run: |
+        if (-not (Test-Path "publish/StudyCafe.Companion.exe")) {
+          throw "publish/StudyCafe.Companion.exe was not created!"
+        }
+        Write-Host "Artifact verified successfully." -ForegroundColor Green

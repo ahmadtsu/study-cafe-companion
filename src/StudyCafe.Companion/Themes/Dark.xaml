@@ -1,0 +1,39 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+  <!-- Adapted from EverythingToolbar Win11 Dark tokens (MIT © 2023 Stephan Rumswinkel). See ATTRIBUTION.md. -->
+
+  <!-- Widget surface tokens (Windows 11 Dark Taskbar Button Hover & Pressed) -->
+  <SolidColorBrush x:Key="WidgetBackground" Color="#01ffffff" />
+  <SolidColorBrush x:Key="WidgetBackgroundHover" Color="#12ffffff" />
+  <SolidColorBrush x:Key="WidgetBackgroundPressed" Color="#0cffffff" />
+  <SolidColorBrush x:Key="WidgetBorderHover" Color="#22ffffff" />
+  <SolidColorBrush x:Key="WidgetBorderPressed" Color="#18ffffff" />
+  <SolidColorBrush x:Key="WidgetForeground" Color="#ffffff" />
+  <SolidColorBrush x:Key="WidgetForegroundHover" Color="#ffffff" />
+  <CornerRadius x:Key="WidgetCornerRadius">4</CornerRadius>
+  <FontFamily x:Key="WidgetFontFamily">Segoe UI Variable Text, Segoe UI</FontFamily>
+  <sys:Double x:Key="WidgetFontSize">12</sys:Double>
+  <FontWeight x:Key="WidgetFontWeight">Normal</FontWeight>
+
+  <!-- ToolTip tokens (Windows 11 Fluent Dark) -->
+  <SolidColorBrush x:Key="ToolTipBackground" Color="#2c2c2c" />
+  <SolidColorBrush x:Key="ToolTipBorder" Color="#3a3a3a" />
+  <SolidColorBrush x:Key="ToolTipForeground" Color="#ffffff" />
+  <CornerRadius x:Key="ToolTipCornerRadius">6</CornerRadius>
+
+  <!-- Study Cafe Phase accent colors -->
+  <SolidColorBrush x:Key="PhaseFocusBrush" Color="#E06D53" />
+  <SolidColorBrush x:Key="PhaseBreakBrush" Color="#5EAA8D" />
+  <SolidColorBrush x:Key="PhaseIdleBrush" Color="#8E8E93" />
+
+  <!-- Context menu tokens adapted from EverythingToolbar Win11 Dark -->
+  <SolidColorBrush x:Key="ContextMenuBackground" Color="#2e2e2e" />
+  <SolidColorBrush x:Key="ContextMenuBorder" Color="#1d1d1d" />
+  <SolidColorBrush x:Key="ContextMenuSeparator" Color="#3e3e3e" />
+  <SolidColorBrush x:Key="ContextMenuItemBackgroundHover" Color="#383838" />
+  <SolidColorBrush x:Key="ContextMenuItemForeground" Color="#D8D8D8" />
+  <SolidColorBrush x:Key="ContextMenuItemForegroundHover" Color="#ffffff" />
+  <CornerRadius x:Key="ContextMenuCornerRadius">8</CornerRadius>
+  <CornerRadius x:Key="ContextMenuMenuItemCornerRadius">5</CornerRadius>
+</ResourceDictionary>
