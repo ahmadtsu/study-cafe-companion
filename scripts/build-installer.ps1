@@ -27,6 +27,9 @@ if (-not $iscc) {
 }
 
 if (-not $iscc) {
+    if ($env:CI -eq "true") {
+        throw "ISCC.exe was not found in the CI runner environment."
+    }
     Write-Warning "ISCC.exe not found on local machine. Portable exe is ready in .\publish\. In GitHub Actions, Inno Setup is installed automatically to generate the setup exe."
     exit 0
 }
