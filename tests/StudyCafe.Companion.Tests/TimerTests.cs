@@ -354,4 +354,63 @@ public class TimerTests
         // Should retain the original 45 seconds rather than resetting to 00:00
         Assert.Equal("00:45", resultTime);
     }
+
+    [Fact]
+    public void TimerEngine_ClampsFutureBreakZeroReachedAt_ToNowSoNotStuckAtZero()
+    {
+        var engine = new TimerCountdownEngine();
+        string? resultTime = null;
+        string? resultPhase = null;
+
+        engine.StateChanged += (time, phase, _, _) =>
+        {
+            resultTime = time;
+            resultPhase = phase;
+        };
+
+        long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        // BreakZeroReachedAt erroneously in future (e.g. clock drift or early termination)
+        engine.HandleBreakEnded(now + 60_000);
+
+        Assert.Equal("00:00", resultTime);
+        Assert.Equal("break_ended", resultPhase);
+    }
+
+    [Fact]
+    public void TimerEngine_ClearsLingeringBreakZeroReachedAt_WhenWorkSessionStarts()
+    {
+        var engine = new TimerCountdownEngine();
+        string? resultTime = null;
+        string? resultPhase = null;
+
+        engine.StateChanged += (time, phase, _, _) =>
+        {
+            resultTime = time;
+            resultPhase = phase;
+        };
+
+        long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        // Break ended 100 seconds ago
+        engine.ApplyRoomState(new RoomStateModel
+        {
+            Phase = "break_ended",
+            DurationSec = 5 * 60,
+            StartedAt = now - 400_000,
+            BreakZeroReachedAt = now - 100_000,
+        });
+        Assert.Equal("01:40", resultTime);
+
+        // Work session starts
+        engine.ApplyRoomState(new RoomStateModel
+        {
+            Phase = "work",
+            DurationSec = 25 * 60,
+            StartedAt = now - 10_000,
+            BreakZeroReachedAt = null,
+        });
+
+        // Must count down 24:50 work timer, not linger in break_ended
+        Assert.Equal("24:50", resultTime);
+        Assert.Equal("work", resultPhase);
+    }
 }
