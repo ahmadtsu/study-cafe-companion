@@ -10,7 +10,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>..\..\assets\logo.ico</ApplicationIcon>
-    <Version>1.0.3</Version>
+    <Version>1.0.4</Version>
     <Product>Study Cafe Companion</Product>
     <Company>Study Cafe</Company>
     <Description>Native Windows 11 taskbar companion widget for Study Cafe</Description>
