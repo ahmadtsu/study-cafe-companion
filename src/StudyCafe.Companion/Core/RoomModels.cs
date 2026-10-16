@@ -40,6 +40,9 @@ public sealed class RoomStateModel
     [JsonPropertyName("breakZeroReachedAt")]
     public long? BreakZeroReachedAt { get; set; }
 
+    [JsonPropertyName("workZeroReachedAt")]
+    public long? WorkZeroReachedAt { get; set; }
+
     [JsonPropertyName("leftTableAt")]
     public long? LeftTableAt { get; set; }
 

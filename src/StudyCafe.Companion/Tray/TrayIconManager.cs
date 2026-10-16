@@ -44,43 +44,65 @@ public sealed class TrayIconManager : IDisposable
             Text = "Study Cafe Companion",
             ContextMenuStrip = _contextMenu,
             Visible = true,
-            Icon = CreateCirclesIcon(DrawingColor.FromArgb(255, 224, 109, 83)),
+            Icon = GetOrCreateIcon(DrawingColor.FromArgb(255, 224, 109, 83)),
         };
 
         _notifyIcon.DoubleClick += (_, _) => OpenInBrowser();
     }
 
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool DestroyIcon(nint hIcon);
+
+    private readonly Dictionary<int, (DrawingIcon Icon, nint HIcon)> _iconCache = new();
+    private DrawingColor? _currentIconColor;
+
     public void UpdateStatus(string formattedTime, string phase, int participants, bool isPaused)
     {
-        string phaseLabel = phase switch
+        try
         {
-            "work" => isPaused ? "Focus (Paused)" : "Focus",
-            "break" => isPaused ? "Break (Paused)" : "Break",
-            "break_ended" => isPaused ? "Break Over (Paused)" : "Break Over",
-            "left_table" => "Left Table",
-            _ => "Ready",
-        };
+            string phaseLabel = phase switch
+            {
+                "work" => isPaused ? "Focus (Paused)" : "Focus",
+                "break" => isPaused ? "Break (Paused)" : "Break",
+                "break_ended" => isPaused ? "Break Over (Paused)" : "Break Over",
+                "left_table" => "Left Table",
+                _ => "Break Over",
+            };
 
-        DrawingColor iconColor = phase switch
+            DrawingColor iconColor = phase switch
+            {
+                "work" => DrawingColor.FromArgb(255, 224, 109, 83),
+                "break" => DrawingColor.FromArgb(255, 94, 170, 141),
+                _ => DrawingColor.FromArgb(255, 239, 68, 68), // Red timer on break over, left table, and non-focus
+            };
+
+            _statusItem.Text = $"Study Cafe • {phaseLabel} ({formattedTime})";
+            var text = $"Study Cafe: {phaseLabel} ({formattedTime})";
+            _notifyIcon.Text = text.Length > 63
+                ? $"Study Cafe: {formattedTime}"
+                : text;
+
+            if (_currentIconColor != iconColor)
+            {
+                _currentIconColor = iconColor;
+                _notifyIcon.Icon = GetOrCreateIcon(iconColor);
+            }
+        }
+        catch (Exception ex)
         {
-            "work" => DrawingColor.FromArgb(255, 224, 109, 83),
-            "break" => DrawingColor.FromArgb(255, 94, 170, 141),
-            "break_ended" or "left_table" => DrawingColor.FromArgb(255, 239, 68, 68),
-            _ => DrawingColor.FromArgb(255, 142, 142, 147),
-        };
-
-        _statusItem.Text = $"Study Cafe • {phaseLabel} ({formattedTime})";
-        _notifyIcon.Text = $"Study Cafe: {phaseLabel} ({formattedTime})".Length > 63
-            ? $"Study Cafe: {formattedTime}"
-            : $"Study Cafe: {phaseLabel} ({formattedTime})";
-
-        var oldIcon = _notifyIcon.Icon;
-        _notifyIcon.Icon = CreateCirclesIcon(iconColor);
-        oldIcon?.Dispose();
+            App.Log($"TrayIconManager.UpdateStatus error: {ex.Message}");
+        }
     }
 
-    private DrawingIcon CreateCirclesIcon(DrawingColor strokeColor)
+    private DrawingIcon GetOrCreateIcon(DrawingColor strokeColor)
     {
+        int key = strokeColor.ToArgb();
+        if (_iconCache.TryGetValue(key, out var cached))
+        {
+            return cached.Icon;
+        }
+
         using var bmp = new DrawingBitmap(32, 32);
         using var g = DrawingGraphics.FromImage(bmp);
         g.SmoothingMode = SmoothingMode.AntiAlias;
@@ -91,7 +113,9 @@ public sealed class TrayIconManager : IDisposable
         g.DrawEllipse(pen, 13, 13, 6, 6);
 
         var hIcon = bmp.GetHicon();
-        return DrawingIcon.FromHandle(hIcon);
+        var icon = DrawingIcon.FromHandle(hIcon);
+        _iconCache[key] = (icon, hIcon);
+        return icon;
     }
 
     private static void OpenInBrowser()
@@ -131,5 +155,12 @@ public sealed class TrayIconManager : IDisposable
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
         _contextMenu.Dispose();
+
+        foreach (var pair in _iconCache.Values)
+        {
+            try { pair.Icon.Dispose(); } catch { }
+            try { DestroyIcon(pair.HIcon); } catch { }
+        }
+        _iconCache.Clear();
     }
 }

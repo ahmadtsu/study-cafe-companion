@@ -159,7 +159,12 @@ public partial class TaskbarWindow : Window
 
     private void ScheduleDockRetry()
     {
-        if (_attachRetriesLeft-- <= 0) return;
+        if (_dockRetryTimer?.IsEnabled == true) return;
+
+        if (_attachRetriesLeft-- <= 0)
+        {
+            _attachRetriesLeft = 10;
+        }
 
         if (_dockRetryTimer == null)
         {

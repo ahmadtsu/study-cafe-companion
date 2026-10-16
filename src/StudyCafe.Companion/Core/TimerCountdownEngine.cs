@@ -14,7 +14,9 @@ public sealed class TimerCountdownEngine
     private int? _pausedRemainingSec;
     private int _participants;
     private long? _breakZeroReachedAt;
+    private long? _workZeroReachedAt;
     private long? _leftTableAt;
+    private long _nonFocusSince = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
     public event Action<string, string, int, bool>? StateChanged;
 
@@ -34,8 +36,21 @@ public sealed class TimerCountdownEngine
             _startedAt = state.StartedAt;
             _isPaused = state.IsPaused;
             _pausedRemainingSec = state.PausedRemainingSec;
-            _breakZeroReachedAt = state.BreakZeroReachedAt;
-            _leftTableAt = state.LeftTableAt;
+
+            if (state.BreakZeroReachedAt.HasValue)
+            {
+                _breakZeroReachedAt = state.BreakZeroReachedAt.Value;
+            }
+
+            if (state.WorkZeroReachedAt.HasValue)
+            {
+                _workZeroReachedAt = state.WorkZeroReachedAt.Value;
+            }
+
+            if (state.LeftTableAt.HasValue)
+            {
+                _leftTableAt = state.LeftTableAt.Value;
+            }
 
             if (_phase == "left_table" && _leftTableAt == null)
             {
@@ -50,7 +65,7 @@ public sealed class TimerCountdownEngine
                 }
                 else
                 {
-                    _breakZeroReachedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    _breakZeroReachedAt = _nonFocusSince;
                 }
             }
 
@@ -72,6 +87,7 @@ public sealed class TimerCountdownEngine
             _isPaused = false;
             _pausedRemainingSec = null;
             _breakZeroReachedAt = null;
+            _workZeroReachedAt = null;
             _leftTableAt = null;
         }
         Tick();
@@ -87,6 +103,7 @@ public sealed class TimerCountdownEngine
             _isPaused = false;
             _pausedRemainingSec = null;
             _breakZeroReachedAt = null;
+            _workZeroReachedAt = null;
             _leftTableAt = null;
         }
         Tick();
@@ -110,7 +127,7 @@ public sealed class TimerCountdownEngine
                 }
                 else
                 {
-                    _breakZeroReachedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    _breakZeroReachedAt = _nonFocusSince;
                 }
             }
         }
@@ -122,7 +139,7 @@ public sealed class TimerCountdownEngine
         lock (_lock)
         {
             _phase = "left_table";
-            _leftTableAt = leftTableAt ?? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            _leftTableAt = leftTableAt ?? _leftTableAt ?? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             _isPaused = false;
             _pausedRemainingSec = null;
         }
@@ -152,6 +169,7 @@ public sealed class TimerCountdownEngine
             _isPaused = false;
             _pausedRemainingSec = null;
             _breakZeroReachedAt = null;
+            _workZeroReachedAt = null;
             _leftTableAt = null;
         }
         Tick();
@@ -175,7 +193,9 @@ public sealed class TimerCountdownEngine
         int? pausedRemainingSec;
         int participants;
         long? breakZeroReachedAt;
+        long? workZeroReachedAt;
         long? leftTableAt;
+        long nonFocusSince;
 
         lock (_lock)
         {
@@ -186,9 +206,12 @@ public sealed class TimerCountdownEngine
             pausedRemainingSec = _pausedRemainingSec;
             participants = _participants;
             breakZeroReachedAt = _breakZeroReachedAt;
+            workZeroReachedAt = _workZeroReachedAt;
             leftTableAt = _leftTableAt;
+            nonFocusSince = _nonFocusSince;
         }
 
+        long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         string formatted;
 
         if (isPaused && pausedRemainingSec.HasValue)
@@ -197,20 +220,14 @@ public sealed class TimerCountdownEngine
         }
         else if (phase == "left_table")
         {
-            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            long leaveTime = leftTableAt ?? now;
+            long leaveTime = leftTableAt ?? nonFocusSince;
             long overtimeMs = Math.Max(0, now - leaveTime);
             int elapsedSec = (int)(overtimeMs / 1000);
 
             formatted = FormatSeconds(elapsedSec);
         }
-        else if (phase == "idle" || (startedAt == null && breakZeroReachedAt == null))
-        {
-            formatted = "Ready";
-        }
         else if (phase == "break" || phase == "break_ended")
         {
-            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             long elapsedMs = startedAt.HasValue ? Math.Max(0, now - startedAt.Value) : 0;
             int elapsedSec = (int)(elapsedMs / 1000);
 
@@ -232,7 +249,7 @@ public sealed class TimerCountdownEngine
                     }
                 }
 
-                long breakEndMs = breakZeroReachedAt ?? (startedAt.HasValue ? startedAt.Value + (long)durationSec * 1000 : now);
+                long breakEndMs = breakZeroReachedAt ?? (startedAt.HasValue ? startedAt.Value + (long)durationSec * 1000 : nonFocusSince);
                 long overtimeMs = Math.Max(0, now - breakEndMs);
                 int postBreakSec = (int)(overtimeMs / 1000);
 
@@ -244,14 +261,44 @@ public sealed class TimerCountdownEngine
                 formatted = FormatSeconds(remainingSec);
             }
         }
+        else if (phase == "work" && startedAt.HasValue)
+        {
+            long elapsedMs = Math.Max(0, now - startedAt.Value);
+            int elapsedSec = (int)(elapsedMs / 1000);
+
+            if (elapsedSec >= durationSec)
+            {
+                // Work session completed! Immediately switch to red timer counting elapsed overtime
+                phase = "break_ended";
+                lock (_lock)
+                {
+                    _phase = "break_ended";
+                    _breakZeroReachedAt ??= workZeroReachedAt ?? (startedAt.Value + (long)durationSec * 1000);
+                    breakZeroReachedAt = _breakZeroReachedAt;
+                }
+
+                long workEndMs = breakZeroReachedAt ?? (startedAt.Value + (long)durationSec * 1000);
+                long overtimeMs = Math.Max(0, now - workEndMs);
+                int postWorkSec = (int)(overtimeMs / 1000);
+
+                formatted = FormatSeconds(postWorkSec);
+            }
+            else
+            {
+                int remainingSec = Math.Max(0, durationSec - elapsedSec);
+                formatted = FormatSeconds(remainingSec);
+            }
+        }
         else
         {
-            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            long elapsedMs = Math.Max(0, now - startedAt!.Value);
+            // Idle / ready / no active countdown:
+            // Red timer is ALWAYS running so user feels regret if they didn't run a timer
+            long idleStart = breakZeroReachedAt ?? leftTableAt ?? nonFocusSince;
+            long elapsedMs = Math.Max(0, now - idleStart);
             int elapsedSec = (int)(elapsedMs / 1000);
-            int remainingSec = Math.Max(0, durationSec - elapsedSec);
 
-            formatted = FormatSeconds(remainingSec);
+            phase = "break_ended";
+            formatted = FormatSeconds(elapsedSec);
         }
 
         StateChanged?.Invoke(formatted, phase, participants, isPaused);

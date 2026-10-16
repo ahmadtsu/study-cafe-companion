@@ -17,6 +17,7 @@ public sealed class LocalLoopbackService : IDisposable
     private readonly TcpListener _listener;
     private readonly TimerCountdownEngine _engine;
     private readonly CancellationTokenSource _cts = new();
+    private string _lastLoggedPhase = "";
     private bool _disposed;
 
     public LocalLoopbackService(TimerCountdownEngine engine, int port = 47800)
@@ -27,11 +28,11 @@ public sealed class LocalLoopbackService : IDisposable
         {
             _listener.Start();
             Task.Run(ListenLoop);
-            Debug.WriteLine($"LocalLoopbackService: listening on http://127.0.0.1:{port}/");
+            App.Log($"LocalLoopbackService: listening on http://127.0.0.1:{port}/");
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"LocalLoopbackService: could not bind port {port}: {ex.Message}");
+            App.Log($"LocalLoopbackService: could not bind port {port}: {ex.Message}");
         }
     }
 
@@ -126,11 +127,16 @@ public sealed class LocalLoopbackService : IDisposable
                             if (state != null)
                             {
                                 _engine.ApplyRoomState(state);
+                                if (_lastLoggedPhase != state.Phase)
+                                {
+                                    _lastLoggedPhase = state.Phase;
+                                    App.Log($"[LocalLoopback] Sync state received: phase={state.Phase}, duration={state.DurationSec}s, isPaused={state.IsPaused}, participants={state.ParticipantCount}");
+                                }
                             }
                         }
                         catch (Exception ex)
                         {
-                            Debug.WriteLine($"Failed to parse sync body: {ex.Message}");
+                            App.Log($"[LocalLoopback] Failed to parse sync body: {ex.Message}");
                         }
                     }
 
@@ -169,6 +175,7 @@ public sealed class LocalLoopbackService : IDisposable
                         catch { }
                     }
 
+                    App.Log($"[LocalLoopback] User left table (leftTableAt={leftAt})");
                     _engine.HandleLeaveTable(leftAt);
                     await SendResponseAsync(stream, 200, "OK", "application/json", "{\"ok\":true}");
                     return;

@@ -255,4 +255,103 @@ public class TimerTests
         Assert.True(bounds.Value.Width > 0);
         Assert.True(bounds.Value.Height > 0);
     }
+
+    [Fact]
+    public void TimerEngine_CountsUpInRed_WhenWorkSessionExpires()
+    {
+        var engine = new TimerCountdownEngine();
+        string? resultTime = null;
+        string? resultPhase = null;
+
+        engine.StateChanged += (time, phase, _, _) =>
+        {
+            resultTime = time;
+            resultPhase = phase;
+        };
+
+        // 25 min work session started 25 min 15 sec ago -> 15 sec overtime
+        long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        engine.HandlePomoStart(25, now - (25 * 60 + 15) * 1000);
+
+        Assert.Equal("00:15", resultTime);
+        Assert.Equal("break_ended", resultPhase);
+    }
+
+    [Fact]
+    public void TimerEngine_KeepsRedTimerRunning_WhenReset()
+    {
+        var engine = new TimerCountdownEngine();
+        string? resultTime = null;
+        string? resultPhase = null;
+
+        engine.StateChanged += (time, phase, _, _) =>
+        {
+            resultTime = time;
+            resultPhase = phase;
+        };
+
+        // Reset called: timer must keep running in red, not stop
+        engine.HandleReset();
+
+        Assert.NotNull(resultTime);
+        Assert.Equal("break_ended", resultPhase);
+    }
+
+    [Fact]
+    public void TimerEngine_CountsOvertime_FromWorkZeroReachedAt()
+    {
+        var engine = new TimerCountdownEngine();
+        string? resultTime = null;
+        string? resultPhase = null;
+
+        engine.StateChanged += (time, phase, _, _) =>
+        {
+            resultTime = time;
+            resultPhase = phase;
+        };
+
+        long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        engine.ApplyRoomState(new RoomStateModel
+        {
+            Phase = "work",
+            DurationSec = 25 * 60,
+            StartedAt = now - 1600_000,
+            WorkZeroReachedAt = now - 100_000, // expired 100s ago -> 01:40
+            IsPaused = false,
+        });
+
+        Assert.Equal("01:40", resultTime);
+        Assert.Equal("break_ended", resultPhase);
+    }
+
+    [Fact]
+    public void TimerEngine_DoesNotResetBreakEndedTimer_OnNullBreakZeroReachedAtSync()
+    {
+        var engine = new TimerCountdownEngine();
+        string? resultTime = null;
+
+        engine.StateChanged += (time, _, _, _) => resultTime = time;
+
+        long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        // Break ended 45 seconds ago
+        engine.ApplyRoomState(new RoomStateModel
+        {
+            Phase = "break_ended",
+            DurationSec = 5 * 60,
+            StartedAt = now - 345_000,
+            BreakZeroReachedAt = now - 45_000,
+        });
+        Assert.Equal("00:45", resultTime);
+
+        // Another sync packet arrives where BreakZeroReachedAt is null
+        engine.ApplyRoomState(new RoomStateModel
+        {
+            Phase = "break_ended",
+            DurationSec = 5 * 60,
+            StartedAt = now - 345_000,
+            BreakZeroReachedAt = null,
+        });
+        // Should retain the original 45 seconds rather than resetting to 00:00
+        Assert.Equal("00:45", resultTime);
+    }
 }

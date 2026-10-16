@@ -77,16 +77,26 @@ public partial class TimerWidgetView : UserControl
             }
             else
             {
-                phaseBrush = (Brush)FindResource("PhaseIdleBrush");
-                phaseLabel = "Ready";
+                phaseBrush = (Brush)FindResource("PhaseBreakEndedBrush");
+                phaseLabel = "Break Over";
             }
 
             Logo.StrokeBrush = phaseBrush;
 
             string personWord = participants == 1 ? "person" : "people";
-            string tooltipText = phase == "idle"
-                ? $"Study Cafe • Ready to focus{(participants > 0 ? $" ({participants} {personWord})" : "")}"
-                : $"Study Cafe • {phaseLabel} ({formattedTime}) • {participants} {personWord} studying";
+            string tooltipText = phase switch
+            {
+                "work" => isPaused
+                    ? $"Study Cafe • Focus (Paused) • {formattedTime} • {participants} {personWord} studying"
+                    : $"Study Cafe • Focus ({formattedTime}) • {participants} {personWord} studying",
+                "break" => isPaused
+                    ? $"Study Cafe • Break (Paused) • {formattedTime} • {participants} {personWord} resting"
+                    : $"Study Cafe • Break ({formattedTime}) • {participants} {personWord} resting",
+                "left_table" => $"Study Cafe • Left Table ({formattedTime})",
+                _ => participants > 0
+                    ? $"Study Cafe • Break Over ({formattedTime}) • {participants} {personWord} studying"
+                    : $"Study Cafe • Break Over ({formattedTime}) • Ready to focus",
+            };
 
             WidgetToolTip.Content = tooltipText;
             MenuStatus.Header = $"Study Cafe • {phaseLabel} ({formattedTime})";
