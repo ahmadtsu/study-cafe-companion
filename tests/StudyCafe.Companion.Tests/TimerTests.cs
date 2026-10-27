@@ -254,6 +254,82 @@ public class TimerTests
         Assert.NotNull(bounds);
         Assert.True(bounds.Value.Width > 0);
         Assert.True(bounds.Value.Height > 0);
+        Assert.True(bounds.Value.Left + bounds.Value.Width <= 1700);
+    }
+
+    [Fact]
+    public void TaskbarBounds_Calculates_RightBounds_WhenClusterNullOnCenteredTaskbar()
+    {
+        var taskbarRect = new Rect(0, 1032, 1920, 48);
+        var trayObstacle = new Rect(1700, 1032, 220, 48);
+        var leftWidgetsObstacle = new Rect(0, 1032, 160, 48);
+        var layout = new TaskbarLayout(null, new[] { leftWidgetsObstacle, trayObstacle });
+
+        var bounds = TaskbarBounds.Calculate(nint.Zero, taskbarRect, layout, 1.0, 90, centerAligned: true);
+
+        Assert.NotNull(bounds);
+        // Should sit to the right of midpoint (960) and to the left of trayObstacle (1700)
+        Assert.True(bounds.Value.Left >= 960);
+        Assert.True(bounds.Value.Left + bounds.Value.Width <= 1700);
+    }
+
+    [Fact]
+    public void TaskbarLayout_IsMeasurable_FalseWhenEmpty()
+    {
+        var emptyLayout = new TaskbarLayout(null, Array.Empty<Rect>());
+        Assert.False(emptyLayout.IsMeasurable);
+
+        var withObstacles = new TaskbarLayout(null, new[] { new Rect(1700, 1032, 220, 48) });
+        Assert.True(withObstacles.IsMeasurable);
+    }
+
+    [Fact]
+    public void TaskbarLayoutProbe_NormalizeTrayIconRects_TrimsSymmetricChevronRotationOverlap()
+    {
+        // During chevron rotation, Show Hidden Icons (normally 2131..2179, w=48) expands symmetrically
+        // around its center (e.g. 2117..2193, w=76), overlapping the adjacent icon starting at 2179 by 14px.
+        var rects = new List<Rect>
+        {
+            new(2117, 1368, 76, 72),
+            new(2179, 1368, 66, 72),
+        };
+
+        var normalized = TaskbarLayoutProbe.NormalizeTrayIconRects(rects);
+
+        Assert.Equal(2131, normalized[0].Left);
+        Assert.Equal(48, normalized[0].Width);
+    }
+
+    [Fact]
+    public void WidgetBounds_Lerp_PreservesLargerDimensionsDuringAnimation()
+    {
+        var from = new WidgetBounds(2000, 0, 132, 72);
+        var to = new WidgetBounds(2040, 0, 92, 72);
+
+        var mid = WidgetBounds.Lerp(from, to, 0.5);
+        Assert.Equal(2020, mid.Left);
+        Assert.Equal(132, mid.Width); // Does not shrink mid-flight
+
+        var end = WidgetBounds.Lerp(from, to, 1.0);
+        Assert.Equal(2040, end.Left);
+        Assert.Equal(92, end.Width);
+    }
+
+    [Theory]
+    [InlineData("Windows.UI.Composition.DesktopWindowContentBridge", true)]
+    [InlineData("DesktopWindowXamlSource", true)]
+    [InlineData("Windows.UI.Input.InputSite.WindowClass", true)]
+    [InlineData("MSTaskListWClass", false)]
+    [InlineData("ReBarWindow32", false)]
+    public void NativeTaskbar_IsModernTaskbarClassName_DetectsModernXamlClasses(string className, bool expected)
+    {
+        Assert.Equal(expected, NativeTaskbar.IsModernTaskbarClassName(className));
+    }
+
+    [Fact]
+    public void NativeTaskbar_IsClassicTaskbar_ReturnsFalseForInvalidHandle()
+    {
+        Assert.False(NativeTaskbar.IsClassicTaskbar(new nint(-1)));
     }
 
     [Fact]

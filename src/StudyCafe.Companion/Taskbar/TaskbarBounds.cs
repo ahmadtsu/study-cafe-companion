@@ -10,8 +10,10 @@ internal readonly record struct WidgetBounds(int Left, int Top, int Width, int H
         new(
             Interpolate(from.Left, to.Left, progress),
             Interpolate(from.Top, to.Top, progress),
-            Interpolate(from.Width, to.Width, progress),
-            Interpolate(from.Height, to.Height, progress)
+            // Never interpolate below the larger width/height while in flight so WPF
+            // content is never clipped by a shrinking native HWND mid-glide.
+            progress >= 1.0 ? to.Width : Math.Max(from.Width, to.Width),
+            progress >= 1.0 ? to.Height : Math.Max(from.Height, to.Height)
         );
 
     private static int Interpolate(int from, int to, double progress) =>
@@ -34,7 +36,8 @@ internal static class TaskbarBounds
         Rect taskbarRectPx,
         TaskbarLayout layout,
         double dpiScale,
-        double desiredContentWidthPx)
+        double desiredContentWidthPx,
+        bool centerAligned = true)
     {
         if (dpiScale <= 0) return null;
 
@@ -58,16 +61,29 @@ internal static class TaskbarBounds
                         o.Right > taskbarRectPx.Left && o.Left < taskbarRectPx.Right)
             .ToList();
 
+        // If cluster is known, gapStart is cluster.Right.
+        // If cluster is unmeasurable/transient:
+        //   - On a centered taskbar: the cluster spans the center, so right gap starts at midpoint.
+        //   - On a left-aligned taskbar: icons start on the left, so gap starts after any left obstacles.
+        double minRightBound = centerAligned
+            ? taskbarRectPx.Left + (taskbarRectPx.Width / 2.0)
+            : relevantObstacles
+                .Where(o => o.Right <= taskbarRectPx.Left + (taskbarRectPx.Width / 2.0))
+                .Select(o => o.Right)
+                .Append(taskbarRectPx.Left)
+                .Max();
+
+        double gapStart = cluster?.Right ?? minRightBound;
+
         // Right alignment: target the system tray icons/chevron which live on the right half of the taskbar.
         // We filter out left-side obstacles (e.g. WidgetsButton at x=0) so they don't falsely collapse the gap.
         double midTaskbar = taskbarRectPx.Left + (taskbarRectPx.Width * 0.4);
         double trayLeft = relevantObstacles
             .Select(o => o.Left)
-            .Where(x => x >= midTaskbar)
+            .Where(x => x >= Math.Max(midTaskbar, gapStart))
             .Append(taskbarRectPx.Right)
             .Min();
 
-        double gapStart = cluster?.Right ?? taskbarRectPx.Left;
         double gapEnd = trayLeft;
 
         // If the cluster extends past the tray (e.g. narrow display), clamp gapStart

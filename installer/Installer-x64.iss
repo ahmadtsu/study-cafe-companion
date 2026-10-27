@@ -5,7 +5,7 @@
 #define PublishDir "..\publish"
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.0.4"
+  #define MyAppVersion "1.0.5"
 #endif
 
 #define ArchitecturesAllowed "x64os"

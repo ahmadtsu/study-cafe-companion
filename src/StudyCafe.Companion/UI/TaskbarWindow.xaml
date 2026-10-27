@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:StudyCafe.Companion.UI"
         Title="StudyCafe.Companion"
+        Left="-10000" Top="-10000"
         Width="120" Height="48"
         AllowsTransparency="True"
         Background="Transparent"

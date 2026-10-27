@@ -62,6 +62,8 @@ internal static class NativeTaskbar
         public uint dwFlags;
     }
 
+    private delegate bool EnumChildProc(nint hwnd, nint lParam);
+
     [DllImport("user32.dll")]
     private static extern nint MonitorFromWindow(nint hwnd, uint dwFlags);
 
@@ -86,6 +88,10 @@ internal static class NativeTaskbar
     [DllImport("user32.dll", SetLastError = true)]
     private static extern nint GetWindow(nint hWnd, int uCmd);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumChildWindows(nint hWndParent, EnumChildProc lpEnumFunc, nint lParam);
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern int GetClassName(nint hWnd, StringBuilder lpClassName, int nMaxCount);
 
@@ -94,6 +100,9 @@ internal static class NativeTaskbar
 
     [DllImport("user32.dll", EntryPoint = "GetDpiForWindow")]
     private static extern uint GetDpiForWindowPrivate(nint hWnd);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowThreadProcessId", SetLastError = true)]
+    private static extern uint GetWindowThreadProcessIdPrivate(nint hWnd, out uint lpdwProcessId);
 
     [DllImport("user32.dll", EntryPoint = "ScreenToClient", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -119,6 +128,16 @@ internal static class NativeTaskbar
         int cx,
         int cy,
         uint uFlags);
+
+    [DllImport("user32.dll", EntryPoint = "OpenInputDesktop")]
+    private static extern nint OpenInputDesktopPrivate(uint dwFlags, [MarshalAs(UnmanagedType.Bool)] bool fInherit, uint dwDesiredAccess);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "OpenDesktop")]
+    private static extern nint OpenDesktopPrivate(string lpszDesktop, uint dwFlags, [MarshalAs(UnmanagedType.Bool)] bool fInherit, uint dwDesiredAccess);
+
+    [DllImport("user32.dll", EntryPoint = "SetThreadDesktop")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetThreadDesktopPrivate(nint hDesktop);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct STARTUPINFO
@@ -179,6 +198,28 @@ internal static class NativeTaskbar
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetUserObjectInformation(nint hObj, int nIndex, StringBuilder pvInfo, int nLength, out int lpnLengthNeeded);
+
+    internal static bool EnsureInteractiveDesktop()
+    {
+        try
+        {
+            var hDesk = OpenInputDesktopPrivate(0, false, 0x01FF);
+            if (hDesk == nint.Zero)
+            {
+                hDesk = OpenDesktopPrivate("Default", 0, false, 0x01FF);
+            }
+
+            if (hDesk != nint.Zero)
+            {
+                return SetThreadDesktopPrivate(hDesk);
+            }
+        }
+        catch
+        {
+        }
+
+        return false;
+    }
 
     internal static string GetCurrentDesktopName()
     {
@@ -256,7 +297,13 @@ internal static class NativeTaskbar
     {
         try
         {
-            return FindWindow("Shell_TrayWnd", null);
+            var handle = FindWindow("Shell_TrayWnd", null);
+            if (handle == nint.Zero)
+            {
+                EnsureInteractiveDesktop();
+                handle = FindWindow("Shell_TrayWnd", null);
+            }
+            return handle;
         }
         catch (Exception ex)
         {
@@ -290,6 +337,7 @@ internal static class NativeTaskbar
         var list = new List<nint>();
         try
         {
+            EnsureInteractiveDesktop();
             nint hwnd = nint.Zero;
             while ((hwnd = FindWindowEx(nint.Zero, hwnd, "Shell_SecondaryTrayWnd", null)) != nint.Zero)
             {
@@ -320,6 +368,95 @@ internal static class NativeTaskbar
         return list;
     }
 
+    internal static bool IsClassicTaskbar(nint taskbar = 0)
+    {
+        try
+        {
+            if (taskbar == nint.Zero)
+            {
+                taskbar = FindTaskbarHandle();
+            }
+
+            if (taskbar == nint.Zero || !IsWindow(taskbar))
+            {
+                return false;
+            }
+
+            // 1. Direct children fast-check for modern Windows 11 taskbar classes
+            nint child = GetWindow(taskbar, GW_CHILD);
+            var sb = new StringBuilder(256);
+            while (child != nint.Zero)
+            {
+                sb.Clear();
+                if (GetClassName(child, sb, sb.Capacity) > 0)
+                {
+                    if (IsModernTaskbarClassName(sb.ToString()))
+                    {
+                        return false;
+                    }
+                }
+
+                child = GetWindow(child, GW_HWNDNEXT);
+            }
+
+            // 2. Deep check: enumerate all descendant windows (handles deeply nested structures in Win11 23H2/24H2)
+            bool modernFound = false;
+            EnumChildWindows(taskbar, (hwnd, _) =>
+            {
+                sb.Clear();
+                if (GetClassName(hwnd, sb, sb.Capacity) > 0)
+                {
+                    if (IsModernTaskbarClassName(sb.ToString()))
+                    {
+                        modernFound = true;
+                        return false; // Stop enumeration immediately
+                    }
+                }
+
+                return true; // Continue enumeration
+            }, nint.Zero);
+
+            if (modernFound)
+            {
+                return false;
+            }
+
+            // If a visible classic task list exists without modern XAML components (e.g. ExplorerPatcher/RetroBar on Win11),
+            // it is a classic taskbar.
+            bool visibleClassicList = false;
+            EnumChildWindows(taskbar, (hwnd, _) =>
+            {
+                sb.Clear();
+                if (GetClassName(hwnd, sb, sb.Capacity) > 0 &&
+                    string.Equals(sb.ToString(), "MSTaskListWClass", StringComparison.OrdinalIgnoreCase) &&
+                    IsWindowVisible(hwnd))
+                {
+                    visibleClassicList = true;
+                    return false;
+                }
+
+                return true;
+            }, nint.Zero);
+
+            if (visibleClassicList)
+            {
+                return true;
+            }
+
+            return Environment.OSVersion.Version.Build < 22000;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"NativeTaskbar.IsClassicTaskbar failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    internal static bool IsModernTaskbarClassName(string className) =>
+        string.Equals(className, TaskbarXamlIslandClass, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(className, "DesktopWindowXamlSource", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(className, "Windows.UI.Input.InputSite.WindowClass", StringComparison.OrdinalIgnoreCase);
+
     internal static bool IsTaskbarAutoHiding()
     {
         try
@@ -349,6 +486,20 @@ internal static class NativeTaskbar
         }
     }
 
+    internal static uint GetWindowThreadProcessId(nint hwnd, out uint processId)
+    {
+        try
+        {
+            return GetWindowThreadProcessIdPrivate(hwnd, out processId);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"NativeTaskbar.GetWindowThreadProcessId failed: {ex.Message}");
+            processId = 0;
+            return 0;
+        }
+    }
+
     internal static bool GetWindowRect(nint hwnd, out RECT rect)
     {
         rect = default;
@@ -359,6 +510,39 @@ internal static class NativeTaskbar
         catch (Exception ex)
         {
             Debug.WriteLine($"NativeTaskbar.GetWindowRect failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    internal static bool TryGetTrayNotifyRect(nint taskbarHandle, out Rect trayRect)
+    {
+        trayRect = Rect.Empty;
+        try
+        {
+            if (taskbarHandle == nint.Zero)
+            {
+                return false;
+            }
+
+            nint trayNotify = FindWindowEx(taskbarHandle, nint.Zero, "TrayNotifyWnd", null);
+            if (trayNotify == nint.Zero || !GetWindowRect(trayNotify, out var r))
+            {
+                return false;
+            }
+
+            int width = r.Right - r.Left;
+            int height = r.Bottom - r.Top;
+            if (width <= 0 || height <= 0)
+            {
+                return false;
+            }
+
+            trayRect = new Rect(r.Left, r.Top, width, height);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"NativeTaskbar.TryGetTrayNotifyRect failed: {ex.Message}");
             return false;
         }
     }

@@ -56,6 +56,7 @@ public partial class App : Application
 
         Log("App starting...");
 
+        NativeTaskbar.EnsureInteractiveDesktop();
         if (!NativeTaskbar.EnsureRunningOnInteractiveDesktop(e.Args))
         {
             Shutdown();
